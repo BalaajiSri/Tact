@@ -5,6 +5,7 @@ struct TimerPreset: Codable, Identifiable {
     var name = ""
     var color = TimerColor.indigo
     var icon = "timer"
+    var sound: TimerSound? = nil
 }
 
 final class Presets: ObservableObject {
@@ -107,7 +108,7 @@ struct QuickPresetCard: View {
                 HStack {
                     ForEach(presets.quick) { preset in
                         Button {
-                            timers.update(id, name: preset.name, color: preset.color, icon: preset.icon)
+                            timers.update(id, name: preset.name, color: preset.color, icon: preset.icon, sound: preset.sound, applySound: true)
                             close()
                         } label: {
                             Label(preset.name, systemImage: preset.icon)
@@ -219,6 +220,16 @@ struct PresetManager: View {
                 .lineLimit(1)
             TextField("Preset name", text: $draft.name).textFieldStyle(.roundedBorder)
             TimerColorPicker(selection: $draft.color)
+            HStack {
+                Picker("Completion sound", selection: $draft.sound) {
+                    Text("Use default").tag(Optional<TimerSound>.none)
+                    ForEach(TimerSound.allCases) { sound in
+                        Text(sound.rawValue).tag(Optional(sound))
+                    }
+                }
+                Button("Preview") { (draft.sound ?? TimerSound.defaultSound).play() }
+                    .disabled((draft.sound ?? TimerSound.defaultSound) == .none)
+            }
             TextField("Search icons", text: $search).textFieldStyle(.roundedBorder)
             ScrollView {
                 LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 8)) {

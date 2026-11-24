@@ -24,35 +24,41 @@ struct ReminderSettingsView: View {
     @State private var status = ""
 
     var body: some View {
-        NavigationStack {
-            Form {
-                Toggle("Quiet morning summary", isOn: $enabled)
-                    .onChange(of: enabled) { _, value in
-                        guard value else { status = ""; refresh(); return }
-                        Task {
-                            do {
-                                let granted = try await UNUserNotificationCenter.current()
-                                    .requestAuthorization(options: [.alert, .badge])
-                                status = granted ? "" : "Allow notifications for Tact in System Settings."
-                                if granted { refresh() } else { enabled = false }
-                            } catch { status = error.localizedDescription; enabled = false }
+        VStack(alignment: .leading, spacing: 15) {
+            Text("Tracker reminders").font(.title2.weight(.semibold))
+            Text("Receive a quiet notification on days when a tracker reaches its date or a milestone.")
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            Toggle("Enable daily summary", isOn: $enabled)
+                .onChange(of: enabled) { _, value in
+                    guard value else { status = ""; refresh(); return }
+                    Task {
+                        do {
+                            let granted = try await UNUserNotificationCenter.current()
+                                .requestAuthorization(options: [.alert, .badge])
+                            status = granted ? "" : "Allow notifications for Tact in System Settings."
+                            if granted { refresh() } else { enabled = false }
+                        } catch {
+                            status = error.localizedDescription
+                            enabled = false
                         }
                     }
-                if enabled {
-                    DatePicker("Reminder time", selection: Binding(get: {
-                        Calendar.current.date(bySettingHour: hour, minute: minute, second: 0, of: .now) ?? .now
-                    }, set: {
-                        hour = Calendar.current.component(.hour, from: $0)
-                        minute = Calendar.current.component(.minute, from: $0)
-                    }), displayedComponents: .hourAndMinute)
-                    Text("One quiet notification for the day’s dates and milestones.").foregroundStyle(.secondary)
                 }
-                if !status.isEmpty { Text(status).foregroundStyle(.secondary) }
+            if enabled {
+                DatePicker("Notification time", selection: Binding(get: {
+                    Calendar.current.date(bySettingHour: hour, minute: minute, second: 0, of: .now) ?? .now
+                }, set: {
+                    hour = Calendar.current.component(.hour, from: $0)
+                    minute = Calendar.current.component(.minute, from: $0)
+                }), displayedComponents: .hourAndMinute)
+                Text("Tact sends a summary only on days with a tracker event.")
+                    .font(.caption).foregroundStyle(.secondary)
             }
-            .navigationTitle("Reminders")
-            .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
+            if !status.isEmpty { Text(status).foregroundStyle(.secondary) }
+            HStack { Spacer(); Button("Done") { dismiss() }.keyboardShortcut(.defaultAction) }
         }
-        .frame(width: 440, height: 220)
+        .padding(24)
+        .frame(width: 440, alignment: .leading)
         .onChange(of: hour) { _, _ in refresh() }
         .onChange(of: minute) { _, _ in refresh() }
     }

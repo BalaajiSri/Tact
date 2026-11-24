@@ -23,6 +23,7 @@ struct Countdown: Codable, Identifiable {
     var name: String? = nil
     var color: TimerColor? = nil
     var icon: String? = nil
+    var sound: TimerSound? = nil
 
     var title: String { name ?? "\(minutes)-minute timer" }
     var tint: Color { (color ?? .indigo).tint }
@@ -55,11 +56,12 @@ final class Timers: ObservableObject {
         return id
     }
 
-    func update(_ id: UUID, name: String, color: TimerColor, icon: String? = nil) {
+    func update(_ id: UUID, name: String, color: TimerColor, icon: String? = nil, sound: TimerSound? = nil, applySound: Bool = false) {
         guard let index = active.firstIndex(where: { $0.id == id }) else { return }
         active[index].name = normalizedName(name)
         active[index].color = color
         if let icon { active[index].icon = icon }
+        if applySound { active[index].sound = sound }
         save()
         refresh?()
     }
@@ -86,7 +88,8 @@ final class Timers: ObservableObject {
             active.removeAll { $0.deadline <= now }
             finished.append(contentsOf: expired)
             save()
-            NSSound.beep()
+            let first = expired.sorted { $0.deadline < $1.deadline }.first
+            (first?.sound ?? TimerSound.defaultSound).play()
         }
         refresh?()
     }
@@ -109,6 +112,7 @@ struct TimerMenu: View {
     @ObservedObject var loginItem: LoginItem
     let showTrackers: () -> Void
     @State private var managingPresets = false
+    @State private var soundSettings = false
     @State private var minutes = 5.0
     @State private var name = ""
     @State private var color = TimerColor.indigo
@@ -132,6 +136,7 @@ struct TimerMenu: View {
                     Button(managingPresets ? "Back to Timers" : "Manage Presets…") {
                         managingPresets.toggle()
                     }
+                    Button(soundSettings ? "Hide Sound Settings" : "Sound Settings…") { soundSettings.toggle() }
                     Toggle("Open at Login", isOn: Binding(
                         get: { loginItem.enabled }, set: loginItem.setEnabled
                     ))
@@ -147,6 +152,7 @@ struct TimerMenu: View {
                 .fixedSize()
                 .accessibilityLabel("Timer options")
             }
+            if soundSettings { SoundSettings() }
             if let error = loginItem.errorMessage {
                 Text(error).font(.caption).foregroundStyle(.secondary)
             }
