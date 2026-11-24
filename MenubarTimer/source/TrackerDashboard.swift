@@ -56,6 +56,7 @@ struct TrackerCard: View {
 
 struct TrackerDashboard: View {
     @ObservedObject var store: TrackerStore
+    let showTimers: () -> Void
     @State private var draft: Tracker?
     @State private var removal: Tracker?
     @State private var showReminders = false
@@ -65,6 +66,7 @@ struct TrackerDashboard: View {
             HStack {
                 Text("Trackers").font(.largeTitle.bold())
                 Spacer()
+                Button(action: showTimers) { Label("Timers", systemImage: "timer") }
                 Button("Reminders…") { showReminders = true }
                 Button {
                     draft = Tracker(end: Calendar.current.date(byAdding: .day, value: 7, to: .now) ?? .now, paletteID: 1)
@@ -132,7 +134,7 @@ final class TrackerDesktop: NSObject, NSWindowDelegate {
     private var dashboard: NSWindow?
     let store = TrackerStore()
 
-    func showDashboard() {
+    func showDashboard(showTimers: @escaping () -> Void) {
         if dashboard == nil {
             let window = NSWindow(
                 contentRect: NSRect(x: 0, y: 0, width: 655, height: 460),
@@ -141,7 +143,7 @@ final class TrackerDesktop: NSObject, NSWindowDelegate {
             )
             window.title = "Menubar Timer — Trackers"
             window.isReleasedWhenClosed = false
-            window.contentViewController = NSHostingController(rootView: TrackerDashboard(store: store))
+            window.contentViewController = NSHostingController(rootView: TrackerDashboard(store: store, showTimers: showTimers))
             window.minSize = NSSize(width: 490, height: 375)
             window.center()
             dashboard = window

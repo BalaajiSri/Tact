@@ -391,14 +391,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         popover.behavior = .transient
         popover.contentViewController = NSHostingController(rootView: TimerMenu(timers: timers, presets: presets) { [weak self] in
             self?.popover.performClose(nil)
-            self?.trackerDesktop.showDashboard()
+            self?.trackerDesktop.showDashboard { [weak self] in self?.showTimerMenu() }
         })
         trackerDesktop.store.didChange = { [weak self] in
             self?.trackerDesktop.refreshPanels()
             self?.refreshTrackerReminders()
         }
         trackerDesktop.refreshPanels()
-        refreshTrackerReminders()
         NotificationCenter.default.addObserver(
             self, selector: #selector(trackerDayChanged(_:)), name: .NSCalendarDayChanged, object: nil
         )
@@ -418,6 +417,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         self.clock = clock
         RunLoop.main.add(clock, forMode: .common)
         timers.tick()
+        refreshTrackerReminders()
     }
 
     @objc private func trackerDayChanged(_ notification: Notification) {
@@ -457,10 +457,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         quickPopover.close()
         if popover.isShown {
             popover.performClose(nil)
-        } else if let button = item.button {
-            NSApp.activate(ignoringOtherApps: true)
-            popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
+        } else {
+            showTimerMenu()
         }
+    }
+
+    private func showTimerMenu() {
+        guard let button = item.button else { return }
+        NSApp.activate(ignoringOtherApps: true)
+        popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
     }
 
     private func showPreview(_ minutes: Int) {

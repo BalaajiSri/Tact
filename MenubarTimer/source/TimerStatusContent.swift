@@ -53,7 +53,8 @@ final class TimerStatusContent {
             }
 
         if segments != lastSegments || hidden != lastHidden {
-            button.attributedTitle = title(segments, hidden: hidden)
+            button.image = statusImage(segments, hidden: hidden)
+            button.imagePosition = .imageOnly
             lastSegments = segments
             lastHidden = hidden
         }
@@ -69,22 +70,47 @@ final class TimerStatusContent {
         }
     }
 
-    private func title(_ segments: [Segment], hidden: Int) -> NSAttributedString {
-        let title = NSMutableAttributedString()
-        for (index, segment) in segments.enumerated() {
-            if index > 0 { title.append(text("  ")) }
-            let attachment = NSTextAttachment()
-            attachment.image = symbol(segment.icon, color: segment.color)
-            attachment.bounds = CGRect(x: 0, y: -3, width: TimerStatusLayout.iconWidth, height: 15)
-            title.append(NSAttributedString(attachment: attachment))
-            if let countdown = segment.countdown { title.append(text(" " + countdown)) }
+    private func statusImage(_ segments: [Segment], hidden: Int) -> NSImage? {
+        if segments.count == 1, let segment = segments.first, segment.countdown == nil, hidden == 0 {
+            return symbol(segment.icon, color: segment.color)
         }
-        if hidden > 0 { title.append(text("  +\(hidden)")) }
-        return title
-    }
 
-    private func text(_ value: String) -> NSAttributedString {
-        NSAttributedString(string: value, attributes: [.font: font, .foregroundColor: NSColor.labelColor])
+        var x: CGFloat = 0
+        var icons: [(NSImage, CGFloat)] = []
+        var labels: [(String, CGFloat)] = []
+        let measure: [NSAttributedString.Key: Any] = [.font: font]
+        func addLabel(_ text: String) {
+            labels.append((text, x))
+            x += ceil((text as NSString).size(withAttributes: measure).width)
+        }
+        for (index, segment) in segments.enumerated() {
+            if index > 0 { x += TimerStatusLayout.separatorWidth }
+            if let image = symbol(segment.icon, color: segment.color) {
+                icons.append((image, x))
+            }
+            x += TimerStatusLayout.iconWidth
+            if let countdown = segment.countdown { addLabel(" " + countdown) }
+        }
+        if hidden > 0 { addLabel("  +\(hidden)") }
+
+        let size = NSSize(width: x, height: 18)
+        let font = font
+        return NSImage(size: size, flipped: false) { _ in
+            for (image, offset) in icons {
+                let scale = min(TimerStatusLayout.iconWidth / image.size.width, 15 / image.size.height, 1)
+                let width = image.size.width * scale
+                let height = image.size.height * scale
+                image.draw(in: NSRect(x: offset + (TimerStatusLayout.iconWidth - width) / 2,
+                                      y: (size.height - height) / 2, width: width, height: height))
+            }
+            let attributes: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: NSColor.labelColor]
+            for (text, offset) in labels {
+                let height = (text as NSString).size(withAttributes: attributes).height
+                (text as NSString).draw(at: NSPoint(x: offset, y: (size.height - height) / 2),
+                                        withAttributes: attributes)
+            }
+            return true
+        }
     }
 
     private func symbol(_ name: String, color: TimerColor) -> NSImage? {
