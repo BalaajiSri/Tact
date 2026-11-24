@@ -7,7 +7,7 @@
 <key>CFBundleDisplayName</key><string>Tact</string>
 <key>CFBundleIconFile</key><string>AppIcon</string>
 <key>CFBundlePackageType</key><string>APPL</string>
-<key>CFBundleShortVersionString</key><string>1.5.2</string>
-<key>CFBundleVersion</key><string>8</string>
+<key>CFBundleShortVersionString</key><string>1.5.3</string>
+<key>CFBundleVersion</key><string>9</string>
 <key>LSUIElement</key><true/>
 </dict></plist>

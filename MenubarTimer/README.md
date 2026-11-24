@@ -19,3 +19,7 @@ Click the menu bar icon, then choose **Trackers → New tracker**. Create a coun
 Choose from 32 palettes or enter a custom hex accent. You can select a symbol, tint the card, and preview light and dark appearances. **Pin to Desktop** creates a draggable card managed by Tact. The card and its position are restored when the app launches again.
 
 Use **Reminders** to enable a quiet macOS notification on a tracker’s event or milestone day.
+
+## Open at login
+
+Tact registers to open at login the first time you run it. After you sign in following a restart, it starts in the menu bar and restores pinned cards to their saved positions when those displays are available. To change this, open the timer menu and use **… → Open at Login**. If macOS asks for approval, choose **Approve in System Settings…**.

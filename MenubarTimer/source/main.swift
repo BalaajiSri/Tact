@@ -106,6 +106,7 @@ final class Timers: ObservableObject {
 struct TimerMenu: View {
     @ObservedObject var timers: Timers
     @ObservedObject var presets: Presets
+    @ObservedObject var loginItem: LoginItem
     let showTrackers: () -> Void
     @State private var managingPresets = false
     @State private var minutes = 5.0
@@ -131,6 +132,12 @@ struct TimerMenu: View {
                     Button(managingPresets ? "Back to Timers" : "Manage Presets…") {
                         managingPresets.toggle()
                     }
+                    Toggle("Open at Login", isOn: Binding(
+                        get: { loginItem.enabled }, set: loginItem.setEnabled
+                    ))
+                    if loginItem.status == .requiresApproval {
+                        Button("Approve in System Settings…", action: loginItem.openSettings)
+                    }
                     Button("Quit Tact") { NSApp.terminate(nil) }
                 } label: {
                     Image(systemName: "ellipsis.circle").font(.title3)
@@ -139,6 +146,9 @@ struct TimerMenu: View {
                 .menuIndicator(.hidden)
                 .fixedSize()
                 .accessibilityLabel("Timer options")
+            }
+            if let error = loginItem.errorMessage {
+                Text(error).font(.caption).foregroundStyle(.secondary)
             }
             if managingPresets {
                 PresetManager(presets: presets) { managingPresets = false }
@@ -372,6 +382,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let timers = Timers()
     private let presets = Presets()
     private let trackerDesktop = TrackerDesktop()
+    private let loginItem = LoginItem()
     private let quickPopover = NSPopover()
     private let popover = NSPopover()
     private let control = StatusControl()
@@ -399,6 +410,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self?.refreshTrackerReminders()
         }
         trackerDesktop.refreshPanels()
+        loginItem.configureDefault()
         NotificationCenter.default.addObserver(
             self, selector: #selector(trackerDayChanged(_:)), name: .NSCalendarDayChanged, object: nil
         )
@@ -451,7 +463,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func makeTimerMenu() -> TimerMenu {
-        TimerMenu(timers: timers, presets: presets) { [weak self] in
+        TimerMenu(timers: timers, presets: presets, loginItem: loginItem) { [weak self] in
             guard let self else { return }
             popover.performClose(nil)
             trackerDesktop.showDashboard { [weak self] in self?.showTimerWindow() }
@@ -459,6 +471,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func showTimerWindow() {
+        loginItem.refresh()
         if timerWindow == nil {
             let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 368, height: 340),
                                   styleMask: [.titled, .closable], backing: .buffered, defer: false)
@@ -493,6 +506,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func showTimerMenu() {
+        loginItem.refresh()
         guard let button = item.button else { return }
         NSApp.activate(ignoringOtherApps: true)
         popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
