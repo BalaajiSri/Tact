@@ -35,6 +35,17 @@ final class TrackerStore: ObservableObject {
         persist()
     }
 
+    func setSize(_ id: UUID, size: String) {
+        defaults.set(size, forKey: "desktopTrackerSize.\(id.uuidString)")
+        didChange?()
+    }
+
+    func resetPosition(_ id: UUID) {
+        defaults.set(true, forKey: "desktopTrackerReset.\(id.uuidString)")
+        defaults.removeObject(forKey: "desktopTrackerPosition.\(id.uuidString)")
+        didChange?()
+    }
+
     private func persist() {
         if let encoded = try? JSONEncoder().encode(trackers) {
             defaults.set(encoded, forKey: "manualTrackers")
@@ -46,10 +57,12 @@ final class TrackerStore: ObservableObject {
 
 struct TrackerCard: View {
     let tracker: Tracker
+    @AppStorage("tactAppearance") private var appearance = "System"
 
     var body: some View {
         TimelineView(.everyMinute) { context in
             ProgressCard(tracker: tracker, date: context.date)
+                .preferredColorScheme(appearance == "System" ? nil : (appearance == "Dark" ? .dark : .light))
         }
     }
 }
@@ -92,6 +105,12 @@ struct TrackerDashboard: View {
                                     }
                                     Spacer()
                                     Menu {
+                                        if pinned {
+                                            Button("Small card") { store.setSize(tracker.id, size: "small") }
+                                            Button("Medium card") { store.setSize(tracker.id, size: "medium") }
+                                            Button("Large card") { store.setSize(tracker.id, size: "large") }
+                                            Button("Reset position") { store.resetPosition(tracker.id) }
+                                        }
                                         Button("Edit tracker") { draft = tracker }
                                         Button("Delete tracker", role: .destructive) { removal = tracker }
                                     } label: {
@@ -157,7 +176,17 @@ final class TrackerDesktop: NSObject, NSWindowDelegate {
             panels.removeValue(forKey: id)?.orderOut(nil)
         }
         for tracker in store.trackers where store.pinned.contains(tracker.id) {
+            let resetKey = "desktopTrackerReset.\(tracker.id.uuidString)"
+            if UserDefaults.standard.bool(forKey: resetKey) {
+                panels.removeValue(forKey: tracker.id)?.orderOut(nil)
+                UserDefaults.standard.removeObject(forKey: resetKey)
+            }
             let card = TrackerCard(tracker: tracker)
+            let sizeName = UserDefaults.standard.string(forKey: "desktopTrackerSize.\(tracker.id.uuidString)") ?? "medium"
+            let size = cardSize(sizeName)
+            if let panel = panels[tracker.id], panel.frame.size != size {
+                panel.setContentSize(size)
+            }
             if let controller = panels[tracker.id]?.contentViewController as? NSHostingController<TrackerCard> {
                 controller.rootView = card
             } else {
@@ -166,9 +195,17 @@ final class TrackerDesktop: NSObject, NSWindowDelegate {
         }
     }
 
+    private func cardSize(_ name: String) -> NSSize {
+        switch name {
+        case "small": return NSSize(width: 170, height: 130)
+        case "large": return NSSize(width: 260, height: 190)
+        default: return NSSize(width: 190, height: 146)
+        }
+    }
+
     private func addPanel(_ id: UUID, card: TrackerCard) {
         guard let screen = NSScreen.main else { return }
-        let size = NSSize(width: 190, height: 146)
+        let size = cardSize(UserDefaults.standard.string(forKey: "desktopTrackerSize.\(id.uuidString)") ?? "medium")
         let key = "desktopTrackerPosition.\(id.uuidString)"
         var frame = NSRect(x: screen.visibleFrame.maxX - size.width - 24,
                            y: screen.visibleFrame.maxY - size.height - 24,

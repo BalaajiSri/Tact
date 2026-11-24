@@ -28,6 +28,7 @@ struct ProgressCard: View {
     let tracker: Tracker
     let date: Date
     @Environment(\.colorScheme) private var scheme
+    @AppStorage("tactAppearance") private var appearance = "System"
 
     private var accent: Color {
         if tracker.customAccent == nil, tracker.paletteID == nil,
@@ -77,7 +78,7 @@ struct ProgressCard: View {
 
     var surface: some View {
         ZStack {
-            Rectangle().fill(scheme == .dark ? Color(rgb: "22232B") : Color(rgb: "FBFBFD"))
+            Rectangle().fill((appearance == "Dark" || (appearance == "System" && scheme == .dark)) ? Color(rgb: "22232B") : Color(rgb: "FBFBFD"))
             if tracker.tinted == true {
                 LinearGradient(colors: [accent, Color(rgb: tracker.gradientHex)],
                                startPoint: .topLeading, endPoint: .bottomTrailing)

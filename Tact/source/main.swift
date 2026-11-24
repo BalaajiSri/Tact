@@ -19,7 +19,8 @@ enum TimerColor: String, Codable, CaseIterable {
 struct Countdown: Codable, Identifiable {
     let id: UUID
     let minutes: Int
-    let deadline: Date
+    var deadline: Date
+    var pausedRemaining: TimeInterval? = nil
     var name: String? = nil
     var color: TimerColor? = nil
     var icon: String? = nil
@@ -71,8 +72,48 @@ final class Timers: ObservableObject {
         return trimmed.isEmpty ? nil : String(trimmed.prefix(60))
     }
 
+    func secondsRemaining(_ timer: Countdown) -> TimeInterval {
+        max(0, timer.pausedRemaining ?? timer.deadline.timeIntervalSince(now))
+    }
+
+    func pauseOrResume(_ id: UUID) {
+        guard let index = active.firstIndex(where: { $0.id == id }) else { return }
+        if let remaining = active[index].pausedRemaining {
+            active[index].deadline = Date().addingTimeInterval(remaining)
+            active[index].pausedRemaining = nil
+        } else {
+            let remaining = active[index].deadline.timeIntervalSinceNow
+            guard remaining > 0 else { tick(); return }
+            active[index].pausedRemaining = remaining
+        }
+        tick()
+        save()
+    }
+
+    func addFiveMinutes(_ id: UUID) {
+        guard let index = active.firstIndex(where: { $0.id == id }) else { return }
+        if let remaining = active[index].pausedRemaining {
+            active[index].pausedRemaining = remaining + 300
+        } else {
+            active[index].deadline = active[index].deadline.addingTimeInterval(300)
+        }
+        tick()
+        save()
+    }
+
+    func repeatTimer(_ timer: Countdown) {
+        var restarted = timer
+        restarted = Countdown(id: UUID(), minutes: timer.minutes,
+                              deadline: Date().addingTimeInterval(Double(timer.minutes * 60)),
+                              name: timer.name, color: timer.color, icon: timer.icon, sound: timer.sound)
+        finished.removeAll { $0.id == timer.id }
+        active.append(restarted)
+        tick()
+        save()
+    }
+
     func fractionRemaining(_ timer: Countdown) -> Double {
-        min(1, max(0, timer.deadline.timeIntervalSince(now) / Double(timer.minutes * 60)))
+        min(1, max(0, secondsRemaining(timer) / Double(timer.minutes * 60)))
     }
 
     func cancel(_ id: UUID) {
@@ -83,9 +124,9 @@ final class Timers: ObservableObject {
 
     func tick() {
         now = Date()
-        let expired = active.filter { $0.deadline <= now }
+        let expired = active.filter { $0.pausedRemaining == nil && $0.deadline <= now }
         if !expired.isEmpty {
-            active.removeAll { $0.deadline <= now }
+            active.removeAll { $0.pausedRemaining == nil && $0.deadline <= now }
             finished.append(contentsOf: expired)
             save()
             let first = expired.sorted { $0.deadline < $1.deadline }.first
@@ -95,7 +136,7 @@ final class Timers: ObservableObject {
     }
 
     func remaining(_ timer: Countdown) -> String {
-        let seconds = max(0, Int(ceil(timer.deadline.timeIntervalSince(now))))
+        let seconds = max(0, Int(ceil(secondsRemaining(timer))))
         return String(format: "%02d:%02d", seconds / 60, seconds % 60)
     }
 
@@ -111,8 +152,8 @@ struct TimerMenu: View {
     @ObservedObject var presets: Presets
     @ObservedObject var loginItem: LoginItem
     let showTrackers: () -> Void
+    let showSettings: () -> Void
     @State private var managingPresets = false
-    @State private var soundSettings = false
     @State private var minutes = 5.0
     @State private var name = ""
     @State private var color = TimerColor.indigo
@@ -136,7 +177,7 @@ struct TimerMenu: View {
                     Button(managingPresets ? "Back to Timers" : "Manage Presets…") {
                         managingPresets.toggle()
                     }
-                    Button(soundSettings ? "Hide Sound Settings" : "Sound Settings…") { soundSettings.toggle() }
+                    Button("Settings…", action: showSettings)
                     Toggle("Open at Login", isOn: Binding(
                         get: { loginItem.enabled }, set: loginItem.setEnabled
                     ))
@@ -152,7 +193,6 @@ struct TimerMenu: View {
                 .fixedSize()
                 .accessibilityLabel("Timer options")
             }
-            if soundSettings { SoundSettings() }
             if let error = loginItem.errorMessage {
                 Text(error).font(.caption).foregroundStyle(.secondary)
             }
@@ -252,12 +292,23 @@ struct TimerMenu: View {
                     .accessibilityLabel("Time remaining")
             }
             if !complete {
+                rowButton(timer.pausedRemaining == nil ? "pause.fill" : "play.fill",
+                          label: timer.pausedRemaining == nil ? "Pause \(timer.title)" : "Resume \(timer.title)") {
+                    timers.pauseOrResume(timer.id)
+                }
+                Menu {
+                    Button("Add 5 minutes") { timers.addFiveMinutes(timer.id) }
+                } label: { Image(systemName: "ellipsis") }
+                .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
                 rowButton("pencil", label: "Edit \(timer.title)") {
                     editing = timer.id
                     name = timer.name ?? ""
                     color = timer.color ?? .indigo
                     nameFocused = true
                 }
+            }
+            if complete {
+                rowButton("arrow.clockwise", label: "Repeat \(timer.title)") { timers.repeatTimer(timer) }
             }
             rowButton("xmark", label: complete ? "Dismiss \(timer.title)" : "Cancel \(timer.title)") {
                 if complete { timers.finished.removeAll { $0.id == timer.id } }
@@ -396,6 +447,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var clock: Timer?
     private var preview: NSPanel?
     private var timerWindow: NSWindow?
+    private var settingsWindow: NSWindow?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         guard let button = item.button else { return }
@@ -469,11 +521,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func makeTimerMenu() -> TimerMenu {
-        TimerMenu(timers: timers, presets: presets, loginItem: loginItem) { [weak self] in
+        TimerMenu(timers: timers, presets: presets, loginItem: loginItem, showTrackers: { [weak self] in
             guard let self else { return }
             popover.performClose(nil)
             trackerDesktop.showDashboard { [weak self] in self?.showTimerWindow() }
+        }, showSettings: { [weak self] in self?.showSettingsWindow() })
+    }
+
+    private func showSettingsWindow() {
+        popover.performClose(nil)
+        loginItem.refresh()
+        if settingsWindow == nil {
+            let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 500, height: 400),
+                                  styleMask: [.titled, .closable], backing: .buffered, defer: false)
+            window.title = "Tact Settings"
+            window.isReleasedWhenClosed = false
+            window.contentViewController = NSHostingController(rootView:
+                SettingsView(loginItem: loginItem, refresh: { [weak self] in self?.refreshTrackerReminders() }))
+            window.center()
+            settingsWindow = window
         }
+        NSApp.activate(ignoringOtherApps: true)
+        settingsWindow?.makeKeyAndOrderFront(nil)
     }
 
     private func showTimerWindow() {

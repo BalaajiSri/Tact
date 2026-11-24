@@ -22,6 +22,7 @@ struct ReminderSettingsView: View {
     @AppStorage("morningHour") private var hour = 8
     @AppStorage("morningMinute") private var minute = 0
     @State private var status = ""
+    @State private var permissionStatus = "Checking…"
 
     var body: some View {
         VStack(alignment: .leading, spacing: 15) {
@@ -55,12 +56,40 @@ struct ReminderSettingsView: View {
                     .font(.caption).foregroundStyle(.secondary)
             }
             if !status.isEmpty { Text(status).foregroundStyle(.secondary) }
+            Text("Notification permission: \(permissionStatus)").font(.caption)
+            Button("Send test notification") {
+                Task {
+                    let center = UNUserNotificationCenter.current()
+                    do {
+                        let granted = try await center.requestAuthorization(options: [.alert, .sound])
+                        guard granted else { status = "Allow notifications for Tact in System Settings."; return }
+                        let content = UNMutableNotificationContent()
+                        content.title = "Tact test notification"
+                        content.body = "Tracker notifications are working."
+                        try await center.add(UNNotificationRequest(identifier: "tact.test",
+                            content: content, trigger: UNTimeIntervalNotificationTrigger(timeInterval: 2, repeats: false)))
+                        status = "Test scheduled for two seconds from now."
+                    } catch { status = error.localizedDescription }
+                    await checkPermission()
+                }
+            }
             HStack { Spacer(); Button("Done") { dismiss() }.keyboardShortcut(.defaultAction) }
         }
         .padding(24)
         .frame(width: 440, alignment: .leading)
+        .task { await checkPermission() }
         .onChange(of: hour) { _, _ in refresh() }
         .onChange(of: minute) { _, _ in refresh() }
+    }
+
+    private func checkPermission() async {
+        let settings = await UNUserNotificationCenter.current().notificationSettings()
+        switch settings.authorizationStatus {
+        case .authorized, .provisional, .ephemeral: permissionStatus = "Allowed"
+        case .denied: permissionStatus = "Denied in System Settings"
+        case .notDetermined: permissionStatus = "Not requested"
+        @unknown default: permissionStatus = "Unknown"
+        }
     }
 }
 

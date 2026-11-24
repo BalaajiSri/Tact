@@ -40,12 +40,12 @@ final class TimerStatusContent {
     private var symbols: [TimerColor: [String: NSImage]] = [:]
 
     func render(_ timers: Timers, on button: NSStatusBarButton) -> CGFloat? {
-        let ordered = timers.active.sorted { $0.deadline < $1.deadline }
+        let ordered = timers.active.filter { $0.pausedRemaining == nil }.sorted { $0.deadline < $1.deadline }
         let screenWidth = (button.window?.screen ?? NSScreen.main)?.frame.width ?? 1280
         let layout = TimerStatusLayout(count: ordered.count, budget: min(300, max(88, screenWidth * 0.21)))
         let hidden = ordered.count - layout.visible
         let segments = ordered.isEmpty
-            ? [Segment(icon: timers.finished.isEmpty ? "timer" : "checkmark.circle.fill",
+            ? [Segment(icon: !timers.active.isEmpty ? "pause.circle" : (timers.finished.isEmpty ? "timer" : "checkmark.circle.fill"),
                        color: timers.finished.last?.color ?? .indigo, countdown: nil)]
             : ordered.prefix(layout.visible).enumerated().map { index, timer in
                 Segment(icon: timer.icon ?? "timer", color: timer.color ?? .indigo,
