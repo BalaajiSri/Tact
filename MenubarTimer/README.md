@@ -11,3 +11,11 @@ Open MenubarTimer.app and look for the timer icon in the macOS menu bar.
 - Active timers use absolute deadlines, so they catch up after sleep or when you reopen the app. Haptic feedback depends on the trackpad and system settings.
 
 To rebuild on a Mac with the Swift command-line tools installed, run `./build.sh` from the `source` folder. The app is built under `build/`.
+
+## Trackers and desktop cards
+
+Click the menu bar icon, then choose **Trackers → New tracker**. Create a countdown to a date, a recurring event, a time-since tracker with optional milestone days, or a date range with percentage progress. Recurring trackers support working-day rules and one-off date overrides.
+
+Choose from 32 palettes or enter a custom hex accent. You can select a symbol, tint the card, and preview light and dark appearances. **Pin to Desktop** creates a draggable card managed by Menubar Timer. The card and its position are restored when the app launches again.
+
+Use **Reminders** to enable a quiet macOS notification on a tracker’s event or milestone day.

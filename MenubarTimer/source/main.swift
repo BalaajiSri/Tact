@@ -106,6 +106,7 @@ final class Timers: ObservableObject {
 struct TimerMenu: View {
     @ObservedObject var timers: Timers
     @ObservedObject var presets: Presets
+    let showTrackers: () -> Void
     @State private var managingPresets = false
     @State private var minutes = 5.0
     @State private var name = ""
@@ -123,6 +124,9 @@ struct TimerMenu: View {
                     .background(TimerColor.indigo.tint.opacity(0.15), in: RoundedRectangle(cornerRadius: 10))
                 Text("Timers").font(.system(size: 23, weight: .semibold))
                 Spacer()
+                Button(action: showTrackers) {
+                    Label("Trackers", systemImage: "calendar")
+                }
                 Menu {
                     Button(managingPresets ? "Back to Timers" : "Manage Presets…") {
                         managingPresets.toggle()
@@ -367,6 +371,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
     private let timers = Timers()
     private let presets = Presets()
+    private let trackerDesktop = TrackerDesktop()
     private let quickPopover = NSPopover()
     private let popover = NSPopover()
     private let control = StatusControl()
@@ -384,7 +389,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         control.setAccessibilityLabel("Menu Bar Timer")
 
         popover.behavior = .transient
-        popover.contentViewController = NSHostingController(rootView: TimerMenu(timers: timers, presets: presets))
+        popover.contentViewController = NSHostingController(rootView: TimerMenu(timers: timers, presets: presets) { [weak self] in
+            self?.popover.performClose(nil)
+            self?.trackerDesktop.showDashboard()
+        })
+        trackerDesktop.store.didChange = { [weak self] in
+            self?.trackerDesktop.refreshPanels()
+            self?.refreshTrackerReminders()
+        }
+        trackerDesktop.refreshPanels()
+        refreshTrackerReminders()
+        NotificationCenter.default.addObserver(
+            self, selector: #selector(trackerDayChanged(_:)), name: .NSCalendarDayChanged, object: nil
+        )
         quickPopover.behavior = .transient
         control.onClick = { [weak self] in self?.toggleMenu() }
         control.onDrag = { [weak self] minutes in self?.showPreview(minutes) }
@@ -401,6 +418,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         self.clock = clock
         RunLoop.main.add(clock, forMode: .common)
         timers.tick()
+    }
+
+    @objc private func trackerDayChanged(_ notification: Notification) {
+        refreshTrackerReminders()
+    }
+
+    private func refreshTrackerReminders() {
+        let trackers = trackerDesktop.store.trackers
+        Task { @MainActor in
+            do {
+                try await ProgressReminders.shared.refresh(trackers, settings: .current)
+            } catch is CancellationError {
+                return
+            } catch {
+                NSLog("Could not schedule tracker reminders: %@", error.localizedDescription)
+            }
+        }
     }
 
     private func renderStatus() {

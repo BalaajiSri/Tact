@@ -26,7 +26,7 @@ MAP
                  -Xcc -ivfsoverlay -Xcc "$overlay/maps.json")
 fi
 
-swiftc "${swift_args[@]}" -O main.swift Presets.swift TimerStatusContent.swift -o "$bundle/Contents/MacOS/MenubarTimer"
+swiftc "${swift_args[@]}" -O main.swift Presets.swift TimerStatusContent.swift Tracker.swift Palettes.swift ProgressCard.swift TrackerDashboard.swift TrackerEditor.swift Reminders.swift -o "$bundle/Contents/MacOS/MenubarTimer"
 cp Info.plist "$bundle/Contents/Info.plist"
 cp AppIcon.icns "$bundle/Contents/Resources/AppIcon.icns"
 codesign --force --sign - "$bundle"
