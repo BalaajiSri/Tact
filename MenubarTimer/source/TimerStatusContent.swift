@@ -39,7 +39,7 @@ final class TimerStatusContent {
     private var lastDescription = ""
     private var symbols: [TimerColor: [String: NSImage]] = [:]
 
-    func render(_ timers: Timers, on button: NSStatusBarButton) {
+    func render(_ timers: Timers, on button: NSStatusBarButton) -> CGFloat? {
         let ordered = timers.active.sorted { $0.deadline < $1.deadline }
         let screenWidth = (button.window?.screen ?? NSScreen.main)?.frame.width ?? 1280
         let layout = TimerStatusLayout(count: ordered.count, budget: min(300, max(88, screenWidth * 0.21)))
@@ -52,9 +52,12 @@ final class TimerStatusContent {
                         countdown: index < layout.expanded ? timers.remaining(timer) : nil)
             }
 
+        var updatedWidth: CGFloat?
         if segments != lastSegments || hidden != lastHidden {
-            button.image = statusImage(segments, hidden: hidden)
-            button.imagePosition = .imageOnly
+            if let image = statusImage(segments, hidden: hidden) {
+                button.image = image
+                updatedWidth = max(28, ceil(image.size.width) + TimerStatusLayout.buttonPadding)
+            }
             lastSegments = segments
             lastHidden = hidden
         }
@@ -68,6 +71,7 @@ final class TimerStatusContent {
                 .setAccessibilityLabel("Menu Bar Timer. " + description)
             lastDescription = description
         }
+        return updatedWidth
     }
 
     private func statusImage(_ segments: [Segment], hidden: Int) -> NSImage? {

@@ -368,7 +368,7 @@ final class StatusControl: NSView {
 }
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
-    private let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+    private lazy var item = NSStatusBar.system.statusItem(withLength: 28)
     private let timers = Timers()
     private let presets = Presets()
     private let trackerDesktop = TrackerDesktop()
@@ -378,6 +378,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let statusContent = TimerStatusContent()
     private var clock: Timer?
     private var preview: NSPanel?
+    private var timerWindow: NSWindow?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         guard let button = item.button else { return }
@@ -389,10 +390,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         control.setAccessibilityLabel("Menu Bar Timer")
 
         popover.behavior = .transient
-        popover.contentViewController = NSHostingController(rootView: TimerMenu(timers: timers, presets: presets) { [weak self] in
-            self?.popover.performClose(nil)
-            self?.trackerDesktop.showDashboard { [weak self] in self?.showTimerMenu() }
-        })
+        item.isVisible = true
+        button.imagePosition = .imageOnly
+        button.image = NSImage(systemSymbolName: "timer", accessibilityDescription: "Timers")
+        popover.contentViewController = NSHostingController(rootView: makeTimerMenu())
         trackerDesktop.store.didChange = { [weak self] in
             self?.trackerDesktop.refreshPanels()
             self?.refreshTrackerReminders()
@@ -439,7 +440,36 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func renderStatus() {
         guard let button = item.button else { return }
-        statusContent.render(timers, on: button)
+        if let width = statusContent.render(timers, on: button) {
+            item.length = width
+        }
+    }
+
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        showTimerWindow()
+        return false
+    }
+
+    private func makeTimerMenu() -> TimerMenu {
+        TimerMenu(timers: timers, presets: presets) { [weak self] in
+            guard let self else { return }
+            popover.performClose(nil)
+            trackerDesktop.showDashboard { [weak self] in self?.showTimerWindow() }
+        }
+    }
+
+    private func showTimerWindow() {
+        if timerWindow == nil {
+            let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 368, height: 340),
+                                  styleMask: [.titled, .closable], backing: .buffered, defer: false)
+            window.title = "Menubar Timer"
+            window.isReleasedWhenClosed = false
+            window.contentViewController = NSHostingController(rootView: makeTimerMenu())
+            window.center()
+            timerWindow = window
+        }
+        NSApp.activate(ignoringOtherApps: true)
+        timerWindow?.makeKeyAndOrderFront(nil)
     }
 
     private func showQuickCard(for id: UUID) {
