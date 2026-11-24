@@ -33,7 +33,7 @@ struct ReminderSettingsView: View {
                             do {
                                 let granted = try await UNUserNotificationCenter.current()
                                     .requestAuthorization(options: [.alert, .badge])
-                                status = granted ? "" : "Allow notifications for Menubar Timer in System Settings."
+                                status = granted ? "" : "Allow notifications for Tact in System Settings."
                                 if granted { refresh() } else { enabled = false }
                             } catch { status = error.localizedDescription; enabled = false }
                         }
@@ -106,7 +106,7 @@ final class ProgressReminders {
         return groups.keys.sorted().prefix(48).map { time in
             let names = groups[time] ?? []
             let content = UNMutableNotificationContent()
-            content.title = "Today in Menubar Timer"
+            content.title = "Today in Tact"
             content.body = names.prefix(4).joined(separator: " · ") +
                 (names.count > 4 ? " · +\(names.count - 4) more" : "")
             content.interruptionLevel = .passive

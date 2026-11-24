@@ -1,12 +1,12 @@
 #!/bin/bash
 set -euo pipefail
 cd "$(dirname "$0")"
-app="${1:-$PWD/build/MenubarTimer.app}"
+app="${1:-$PWD/build/Tact.app}"
 cache="$(dirname "$app")/.swift-module-cache"
 mkdir -p "$(dirname "$app")" "$cache"
 staging=$(mktemp -d /tmp/menubar-timer-build.XXXXXXXX)
 trap 'rm -r "$staging"' EXIT
-bundle="$staging/MenubarTimer.app"
+bundle="$staging/Tact.app"
 mkdir -p "$bundle/Contents/MacOS" "$bundle/Contents/Resources"
 sdk=$(xcrun --show-sdk-path)
 swift_args=(-sdk "$sdk" -module-cache-path "$cache")

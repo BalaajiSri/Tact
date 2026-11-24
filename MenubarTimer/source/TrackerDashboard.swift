@@ -141,7 +141,7 @@ final class TrackerDesktop: NSObject, NSWindowDelegate {
                 styleMask: [.titled, .closable, .miniaturizable, .resizable],
                 backing: .buffered, defer: false
             )
-            window.title = "Menubar Timer — Trackers"
+            window.title = "Tact — Trackers"
             window.isReleasedWhenClosed = false
             window.contentViewController = NSHostingController(rootView: TrackerDashboard(store: store, showTimers: showTimers))
             window.minSize = NSSize(width: 490, height: 375)

@@ -131,7 +131,7 @@ struct TimerMenu: View {
                     Button(managingPresets ? "Back to Timers" : "Manage Presets…") {
                         managingPresets.toggle()
                     }
-                    Button("Quit Menubar Timer") { NSApp.terminate(nil) }
+                    Button("Quit Tact") { NSApp.terminate(nil) }
                 } label: {
                     Image(systemName: "ellipsis.circle").font(.title3)
                 }
@@ -462,7 +462,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if timerWindow == nil {
             let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 368, height: 340),
                                   styleMask: [.titled, .closable], backing: .buffered, defer: false)
-            window.title = "Menubar Timer"
+            window.title = "Tact"
             window.isReleasedWhenClosed = false
             window.contentViewController = NSHostingController(rootView: makeTimerMenu())
             window.center()

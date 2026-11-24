@@ -1,6 +1,6 @@
-# Menubar Timer
+# Tact
 
-Open MenubarTimer.app and look for the timer icon in the macOS menu bar.
+Open Tact.app and look for the timer icon in the macOS menu bar.
 
 - Drag straight down from the icon. The preview shows a duration from 0 to 60 minutes in one-minute steps. Release at 1–60 minutes to start. Return to 0 or press Escape to cancel the gesture.
 - After releasing a drag, use Learn, Work, or Break to apply a name, icon, and colour while the timer runs. You can also enter a custom name or use the colour dot. The card closes after four seconds when idle.
@@ -16,6 +16,6 @@ To rebuild on a Mac with the Swift command-line tools installed, run `./build.sh
 
 Click the menu bar icon, then choose **Trackers → New tracker**. Create a countdown to a date, a recurring event, a time-since tracker with optional milestone days, or a date range with percentage progress. Recurring trackers support working-day rules and one-off date overrides.
 
-Choose from 32 palettes or enter a custom hex accent. You can select a symbol, tint the card, and preview light and dark appearances. **Pin to Desktop** creates a draggable card managed by Menubar Timer. The card and its position are restored when the app launches again.
+Choose from 32 palettes or enter a custom hex accent. You can select a symbol, tint the card, and preview light and dark appearances. **Pin to Desktop** creates a draggable card managed by Tact. The card and its position are restored when the app launches again.
 
 Use **Reminders** to enable a quiet macOS notification on a tracker’s event or milestone day.
