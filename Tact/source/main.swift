@@ -545,6 +545,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 }
 
+// The bundle identifier changed when the app was renamed to Tact.
+private func migrateSavedData() {
+    let defaults = UserDefaults.standard
+    let migrationKey = "didMigratePreviousAppData"
+    guard !defaults.bool(forKey: migrationKey) else { return }
+    let previous = defaults.persistentDomain(forName: "local.menubartimer.app") ?? [:]
+    let keys: Set<String> = [
+        "activeCountdowns", "timerPresetCatalog", "manualTrackers", "desktopTrackerIDs",
+        "morningEnabled", "morningHour", "morningMinute"
+    ]
+    for (key, value) in previous where keys.contains(key) || key.hasPrefix("desktopTrackerPosition.") {
+        if defaults.object(forKey: key) == nil { defaults.set(value, forKey: key) }
+    }
+    defaults.set(true, forKey: migrationKey)
+}
+
+migrateSavedData()
 let app = NSApplication.shared
 let delegate = AppDelegate()
 app.delegate = delegate

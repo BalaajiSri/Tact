@@ -23,3 +23,7 @@ Use **Reminders** to enable a quiet macOS notification on a tracker’s event or
 ## Open at login
 
 Tact registers to open at login the first time you run it. After you sign in following a restart, it starts in the menu bar and restores pinned cards to their saved positions when those displays are available. To change this, open the timer menu and use **… → Open at Login**. If macOS asks for approval, choose **Approve in System Settings…**.
+
+## Upgrading from Menubar Timer
+
+Quit the previous app, then open Tact. On first launch, Tact copies your saved timers, presets, trackers, card positions, and reminder settings. Tact registers its new app bundle for login.

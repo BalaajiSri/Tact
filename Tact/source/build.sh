@@ -4,7 +4,7 @@ cd "$(dirname "$0")"
 app="${1:-$PWD/build/Tact.app}"
 cache="$(dirname "$app")/.swift-module-cache"
 mkdir -p "$(dirname "$app")" "$cache"
-staging=$(mktemp -d /tmp/menubar-timer-build.XXXXXXXX)
+staging=$(mktemp -d /tmp/tact-build.XXXXXXXX)
 trap 'rm -r "$staging"' EXIT
 bundle="$staging/Tact.app"
 mkdir -p "$bundle/Contents/MacOS" "$bundle/Contents/Resources"
@@ -26,7 +26,7 @@ MAP
                  -Xcc -ivfsoverlay -Xcc "$overlay/maps.json")
 fi
 
-swiftc "${swift_args[@]}" -O main.swift Presets.swift TimerStatusContent.swift Tracker.swift Palettes.swift ProgressCard.swift TrackerDashboard.swift TrackerEditor.swift Reminders.swift LoginItem.swift -o "$bundle/Contents/MacOS/MenubarTimer"
+swiftc "${swift_args[@]}" -O main.swift Presets.swift TimerStatusContent.swift Tracker.swift Palettes.swift ProgressCard.swift TrackerDashboard.swift TrackerEditor.swift Reminders.swift LoginItem.swift -o "$bundle/Contents/MacOS/Tact"
 cp Info.plist "$bundle/Contents/Info.plist"
 cp AppIcon.icns "$bundle/Contents/Resources/AppIcon.icns"
 codesign --force --sign - "$bundle"

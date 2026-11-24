@@ -75,7 +75,7 @@ final class ProgressReminders {
         let wanted: [UNNotificationRequest] = settings.enabled
             ? summaryRequests(trackers, settings: settings, now: now, calendar: calendar) : []
         let wantedByID = Dictionary(uniqueKeysWithValues: wanted.map { ($0.identifier, $0) })
-        let previous = pending.filter { $0.identifier.hasPrefix("menubartimer.tracker-summary.") }
+        let previous = pending.filter { $0.identifier.hasPrefix("tact.tracker-summary.") }
         center.removePendingNotificationRequests(withIdentifiers: previous.filter {
             wantedByID[$0.identifier] == nil
         }.map(\.identifier))
@@ -112,7 +112,7 @@ final class ProgressReminders {
             content.interruptionLevel = .passive
             let components = calendar.dateComponents([.year, .month, .day, .hour, .minute], from: time)
             let trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: false)
-            let id = "menubartimer.tracker-summary.\(Int(calendar.startOfDay(for: time).timeIntervalSince1970))"
+            let id = "tact.tracker-summary.\(Int(calendar.startOfDay(for: time).timeIntervalSince1970))"
             return UNNotificationRequest(identifier: id, content: content, trigger: trigger)
         }
     }
