@@ -28,7 +28,6 @@ struct ProgressCard: View {
     let tracker: Tracker
     let date: Date
     @Environment(\.colorScheme) private var scheme
-    @AppStorage("tactAppearance") private var appearance = "System"
 
     private var accent: Color {
         if tracker.customAccent == nil, tracker.paletteID == nil,
@@ -48,9 +47,9 @@ struct ProgressCard: View {
                     .background(.primary.opacity(0.075), in: RoundedRectangle(cornerRadius: 9))
                     .accessibilityHidden(true)
                 Spacer()
-                if let fraction = reading.fraction {
+                if let fraction = reading.fraction, (tracker.cardStyle ?? "Ring") == "Ring" {
                     ZStack {
-                        Circle().strokeBorder(accent.opacity(0.22), lineWidth: 4)
+                        Circle().strokeBorder(remaining, lineWidth: 4)
                         Circle().inset(by: 2).trim(from: 0, to: fraction)
                             .stroke(accent, style: StrokeStyle(lineWidth: 4, lineCap: .round))
                             .rotationEffect(.degrees(-90))
@@ -63,9 +62,13 @@ struct ProgressCard: View {
             Text(tracker.name).font(.subheadline.weight(.semibold)).lineLimit(1)
             Text(reading.value).font(.system(.title2, design: .rounded, weight: .bold))
                 .monospacedDigit().lineLimit(1).minimumScaleFactor(0.55)
-            Text(reading.detail).font(.caption).foregroundStyle(.secondary)
+            if let fraction = reading.fraction {
+                progressDisplay(fraction, totalDays: reading.totalDays, elapsedDays: reading.elapsedDays)
+            }
+            Text(reading.detail).font(.caption).opacity(0.7)
                 .lineLimit(1).minimumScaleFactor(0.7)
         }
+        .foregroundStyle(tracker.textHex.map { Color(rgb: $0) } ?? .primary)
         .padding(15)
         .frame(maxWidth: .infinity, minHeight: 146, alignment: .leading)
         .background {
@@ -76,9 +79,43 @@ struct ProgressCard: View {
         }
     }
 
+    private var remaining: Color {
+        tracker.remainingHex.map { Color(rgb: $0) } ?? accent.opacity(0.22)
+    }
+
+    @ViewBuilder private func progressDisplay(_ fraction: Double, totalDays: Int?, elapsedDays: Int?) -> some View {
+        switch tracker.cardStyle ?? "Ring" {
+        case "Dots", "Blocks":
+            let isDots = tracker.cardStyle == "Dots"
+            let count = max(1, totalDays ?? 20)
+            let filled = min(count, max(0, elapsedDays ?? Int((fraction * Double(count)).rounded())))
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 3), count: min(10, count)), spacing: 3) {
+                ForEach(0..<count, id: \.self) { index in
+                    RoundedRectangle(cornerRadius: isDots ? 5 : 2)
+                        .fill(index < filled ? accent : remaining)
+                        .frame(height: isDots ? 8 : 10)
+                }
+            }
+            .frame(maxHeight: 48)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("\(Int(fraction * 100)) percent complete")
+        case "Bar":
+            GeometryReader { geometry in
+                ZStack(alignment: .leading) {
+                    Capsule().fill(remaining)
+                    Capsule().fill(accent).frame(width: geometry.size.width * fraction)
+                }
+            }
+            .frame(height: 7)
+            .accessibilityLabel("\(Int(fraction * 100)) percent complete")
+        default:
+            EmptyView()
+        }
+    }
+
     var surface: some View {
         ZStack {
-            Rectangle().fill((appearance == "Dark" || (appearance == "System" && scheme == .dark)) ? Color(rgb: "22232B") : Color(rgb: "FBFBFD"))
+            Rectangle().fill(tracker.backgroundHex.map { Color(rgb: $0) } ?? (scheme == .dark ? Color(rgb: "22232B") : Color(rgb: "FBFBFD")))
             if tracker.tinted == true {
                 LinearGradient(colors: [accent, Color(rgb: tracker.gradientHex)],
                                startPoint: .topLeading, endPoint: .bottomTrailing)

@@ -39,17 +39,40 @@ final class TimerStatusContent {
     private var lastDescription = ""
     private var symbols: [TimerColor: [String: NSImage]] = [:]
 
-    func render(_ timers: Timers, on button: NSStatusBarButton) -> CGFloat? {
+    func render(_ timers: Timers, routines: RoutineStore, on button: NSStatusBarButton) -> CGFloat? {
         let ordered = timers.active.filter { $0.pausedRemaining == nil }.sorted { $0.deadline < $1.deadline }
         let screenWidth = (button.window?.screen ?? NSScreen.main)?.frame.width ?? 1280
-        let layout = TimerStatusLayout(count: ordered.count, budget: min(300, max(88, screenWidth * 0.21)))
-        let hidden = ordered.count - layout.visible
-        let segments = ordered.isEmpty
+        var entries: [(segment: Segment, description: String)] = []
+        if let run = routines.run {
+            let activity = routines.current
+            let label: String
+            if let remaining = run.pausedRemaining {
+                label = "Ⅱ " + formatted(remaining)
+            } else if run.phase == "running" {
+                label = formatted(run.deadline.timeIntervalSince(routines.now))
+            } else if run.phase == "delay", let deadline = run.delayUntil {
+                label = formatted(deadline.timeIntervalSince(routines.now))
+            } else {
+                label = run.phase == "sleep" ? "Wake" : "Choose"
+            }
+            let step = activity?.name ?? run.routine.name
+            entries.append((Segment(icon: "arrow.triangle.2.circlepath",
+                                    color: activity?.color ?? .indigo, countdown: label),
+                            "Routine \(run.routine.name), \(step), \(label)"))
+        }
+        entries += ordered.map { timer in
+            (Segment(icon: timer.icon ?? "timer", color: timer.color ?? .indigo,
+                     countdown: timers.remaining(timer)), "\(timer.title)  \(timers.remaining(timer))")
+        }
+        let layout = TimerStatusLayout(count: entries.count, budget: min(300, max(88, screenWidth * 0.21)))
+        let hidden = entries.count - layout.visible
+        let segments = entries.isEmpty
             ? [Segment(icon: !timers.active.isEmpty ? "pause.circle" : (timers.finished.isEmpty ? "timer" : "checkmark.circle.fill"),
                        color: timers.finished.last?.color ?? .indigo, countdown: nil)]
-            : ordered.prefix(layout.visible).enumerated().map { index, timer in
-                Segment(icon: timer.icon ?? "timer", color: timer.color ?? .indigo,
-                        countdown: index < layout.expanded ? timers.remaining(timer) : nil)
+            : entries.prefix(layout.visible).enumerated().map { index, entry in
+                Segment(icon: entry.segment.icon, color: entry.segment.color,
+                        countdown: index < layout.expanded || (index == 0 && routines.run != nil)
+                            ? entry.segment.countdown : nil)
             }
 
         var updatedWidth: CGFloat?
@@ -62,9 +85,9 @@ final class TimerStatusContent {
             lastHidden = hidden
         }
 
-        let description = ordered.isEmpty
+        let description = entries.isEmpty
             ? (timers.finished.isEmpty ? "No running timers" : "\(timers.finished.count) finished")
-            : ordered.map { "\($0.title)  \(timers.remaining($0))" }.joined(separator: "\n")
+            : entries.map(\.description).joined(separator: "\n")
         if description != lastDescription {
             button.toolTip = description
             button.subviews.first(where: { $0 is StatusControl })?
@@ -72,6 +95,11 @@ final class TimerStatusContent {
             lastDescription = description
         }
         return updatedWidth
+    }
+
+    private func formatted(_ value: TimeInterval) -> String {
+        let seconds = max(0, Int(ceil(value)))
+        return String(format: "%02d:%02d", seconds / 60, seconds % 60)
     }
 
     private func statusImage(_ segments: [Segment], hidden: Int) -> NSImage? {

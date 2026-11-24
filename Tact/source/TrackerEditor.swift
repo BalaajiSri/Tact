@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 
 struct TrackerEditor: View {
     @Environment(\.dismiss) private var dismiss
@@ -26,6 +27,26 @@ struct TrackerEditor: View {
             milestones = (tracker.milestones ?? []).map(String.init).joined(separator: ", ")
             customHex = tracker.customAccent ?? ""
         }
+    }
+
+    private func colourControl(_ label: String, value: Binding<String?>, fallback: String) -> some View {
+        HStack {
+            ColorPicker(label, selection: Binding(
+                get: { Color(rgb: value.wrappedValue ?? fallback) },
+                set: { value.wrappedValue = hexString($0) }
+            ), supportsOpacity: false)
+            TextField("Hex", text: Binding(
+                get: { value.wrappedValue ?? "" },
+                set: { value.wrappedValue = $0.isEmpty ? nil : $0 }
+            )).textFieldStyle(.roundedBorder).frame(width: 90)
+            Button("Reset") { value.wrappedValue = nil }
+        }
+    }
+
+    private func hexString(_ color: Color) -> String {
+        let rgb = NSColor(color).usingColorSpace(.sRGB) ?? .black
+        return String(format: "%02X%02X%02X", Int((rgb.redComponent * 255).rounded()),
+                      Int((rgb.greenComponent * 255).rounded()), Int((rgb.blueComponent * 255).rounded()))
     }
 
     private var previewCard: some View {
@@ -87,6 +108,19 @@ struct TrackerEditor: View {
                                 }
                             }
                             swatches
+                            Picker("Progress style", selection: Binding(
+                                get: { tracker.cardStyle ?? "Ring" },
+                                set: { tracker.cardStyle = $0 }
+                            )) {
+                                ForEach(["Ring", "Dots", "Blocks", "Bar", "Text"], id: \.self) { Text($0) }
+                            }
+                            colourControl("Background", value: $tracker.backgroundHex, fallback: "FBFBFD")
+                            colourControl("Text", value: $tracker.textHex, fallback: "202020")
+                            colourControl("Remaining progress", value: $tracker.remainingHex, fallback: "A0A0A0")
+                            ColorPicker("Progress / ring", selection: Binding(
+                                get: { Color(rgb: hexValid ? hex : tracker.accentHex) },
+                                set: { customHex = hexString($0) }
+                            ), supportsOpacity: false)
                             HStack {
                                 TextField("Custom hex", text: $customHex)
                                     .textFieldStyle(.roundedBorder)
@@ -188,7 +222,10 @@ struct TrackerEditor: View {
         let validMilestones = tracker.mode != .elapsed || milestones.isEmpty ||
             (enteredMilestones.count == milestones.split(separator: ",", omittingEmptySubsequences: false).count
              && enteredMilestones.allSatisfy { $0 > 0 && $0 <= 36500 })
-        return !cleanName.isEmpty && (hex.isEmpty || hexValid) && validMilestones &&
+        let colours = [tracker.backgroundHex, tracker.textHex, tracker.remainingHex].compactMap { $0 }
+        let validColours = colours.allSatisfy { $0.count == 6 && UInt32($0, radix: 16) != nil }
+        return !cleanName.isEmpty && validColours &&
+            (tracker.mode != .recurring || tracker.repeatRule != .weekly || !(tracker.weekdays ?? [tracker.weekday]).isEmpty) && (hex.isEmpty || hexValid) && validMilestones &&
             (tracker.mode != .progress || calendar.startOfDay(for: tracker.end) > calendar.startOfDay(for: tracker.start))
     }
 
@@ -247,6 +284,28 @@ struct TrackerEditor: View {
             }
             .onChange(of: tracker.repeatRule) { _, _ in tracker.dateOverride = nil }
             switch tracker.repeatRule {
+            case .daily:
+                DatePicker("Starting date", selection: $tracker.start, displayedComponents: .date)
+                Stepper("Every \(tracker.dayInterval ?? 1) day(s)", value: Binding(
+                    get: { tracker.dayInterval ?? 1 }, set: { tracker.dayInterval = $0 }
+                ), in: 1...365)
+            case .weekly:
+                VStack(alignment: .leading) {
+                    Text("Days")
+                    HStack {
+                        ForEach(Array(Calendar.current.shortWeekdaySymbols.enumerated()), id: \.offset) { entry in
+                            let day = entry.offset + 1
+                            Toggle(entry.element, isOn: Binding(
+                                get: { (tracker.weekdays ?? [tracker.weekday]).contains(day) },
+                                set: { selected in
+                                    var days = Set(tracker.weekdays ?? [tracker.weekday])
+                                    if selected { days.insert(day) } else { days.remove(day) }
+                                    tracker.weekdays = days.sorted()
+                                }
+                            )).toggleStyle(.checkbox)
+                        }
+                    }
+                }
             case .monthlyDay:
                 Stepper("Day \(tracker.monthDay)", value: $tracker.monthDay, in: 1...31)
                     .onChange(of: tracker.monthDay) { _, _ in tracker.dateOverride = nil }
@@ -254,10 +313,17 @@ struct TrackerEditor: View {
                     ForEach(WeekendRule.allCases) { Text($0.rawValue).tag($0) }
                 }
                 .onChange(of: tracker.weekendRule) { _, _ in tracker.dateOverride = nil }
+            case .monthlyWorkday:
+                Picker("Working day", selection: $tracker.ordinal) {
+                    ForEach(1...23, id: \.self) { number in
+                        Text("Working day \(number)").tag(number)
+                    }
+                    Text("Last working day").tag(-1)
+                }
             case .ordinalWeekday:
                 Picker("Occurrence", selection: $tracker.ordinal) {
-                    ForEach(Array(["First", "Second", "Third", "Fourth", "Last"].enumerated()), id: \.offset) { entry in
-                        Text(entry.element).tag(entry.offset == 4 ? -1 : entry.offset + 1)
+                    ForEach(Array(["First", "Second", "Third", "Fourth", "Fifth", "Last"].enumerated()), id: \.offset) { entry in
+                        Text(entry.element).tag(entry.offset == 5 ? -1 : entry.offset + 1)
                     }
                 }
                 .onChange(of: tracker.ordinal) { _, _ in tracker.dateOverride = nil }
@@ -267,11 +333,32 @@ struct TrackerEditor: View {
                     }
                 }
                 .onChange(of: tracker.weekday) { _, _ in tracker.dateOverride = nil }
+                Picker("If non-working", selection: $tracker.weekendRule) {
+                    ForEach(WeekendRule.allCases) { Text($0.rawValue).tag($0) }
+                }
             case .yearly:
                 DatePicker("Anniversary date", selection: $tracker.end, displayedComponents: .date)
                     .onChange(of: tracker.end) { _, _ in tracker.dateOverride = nil }
             case .firstWorkday, .lastWorkday:
                 Text("Working days are Monday to Friday.").font(.caption).foregroundStyle(.secondary)
+            }
+            if [.monthlyDay, .monthlyWorkday, .firstWorkday, .lastWorkday, .ordinalWeekday].contains(tracker.repeatRule) {
+                Text("Working days are Monday to Friday. Add holidays below.")
+                    .font(.caption).foregroundStyle(.secondary)
+                ForEach(Array((tracker.excludedDates ?? []).enumerated()), id: \.offset) { entry in
+                    HStack {
+                        DatePicker("Holiday", selection: Binding(
+                            get: { (tracker.excludedDates ?? [])[entry.offset] },
+                            set: { tracker.excludedDates?[entry.offset] = $0 }
+                        ), displayedComponents: .date)
+                        Button("Remove") { tracker.excludedDates?.remove(at: entry.offset) }
+                    }
+                }
+                Button("Add holiday") {
+                    var dates = tracker.excludedDates ?? []
+                    dates.append(Date())
+                    tracker.excludedDates = dates
+                }
             }
             Picker("Show", selection: $tracker.showPercentage) {
                 Text("Days remaining").tag(false)

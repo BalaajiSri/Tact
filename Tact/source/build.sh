@@ -26,7 +26,7 @@ MAP
                  -Xcc -ivfsoverlay -Xcc "$overlay/maps.json")
 fi
 
-swiftc "${swift_args[@]}" -O main.swift Presets.swift TimerStatusContent.swift Tracker.swift Palettes.swift ProgressCard.swift TrackerDashboard.swift TrackerEditor.swift Reminders.swift LoginItem.swift TimerSounds.swift SettingsView.swift -o "$bundle/Contents/MacOS/Tact"
+swiftc "${swift_args[@]}" -O main.swift Presets.swift TimerStatusContent.swift Tracker.swift Palettes.swift ProgressCard.swift TrackerDashboard.swift TrackerEditor.swift Reminders.swift LoginItem.swift TimerSounds.swift SettingsView.swift Routines.swift -o "$bundle/Contents/MacOS/Tact"
 cp Info.plist "$bundle/Contents/Info.plist"
 cp AppIcon.icns "$bundle/Contents/Resources/AppIcon.icns"
 codesign --force --sign - "$bundle"

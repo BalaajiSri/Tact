@@ -41,6 +41,15 @@ struct SettingsView: View {
         }
         .frame(width: 500, height: 400)
         .sheet(isPresented: $showReminders) { ReminderSettingsView(refresh: refresh) }
-        .onAppear { loginItem.refresh() }
+        .onAppear { loginItem.refresh(); applyAppearance() }
+        .onChange(of: appearance) { _, _ in applyAppearance() }
+    }
+
+    private func applyAppearance() {
+        switch appearance {
+        case "Light": NSApp.appearance = NSAppearance(named: .aqua)
+        case "Dark": NSApp.appearance = NSAppearance(named: .darkAqua)
+        default: NSApp.appearance = nil
+        }
     }
 }

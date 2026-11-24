@@ -150,8 +150,10 @@ final class Timers: ObservableObject {
 struct TimerMenu: View {
     @ObservedObject var timers: Timers
     @ObservedObject var presets: Presets
+    @ObservedObject var routines: RoutineStore
     @ObservedObject var loginItem: LoginItem
     let showTrackers: () -> Void
+    let showRoutines: () -> Void
     let showSettings: () -> Void
     @State private var managingPresets = false
     @State private var minutes = 5.0
@@ -174,6 +176,7 @@ struct TimerMenu: View {
                     Label("Trackers", systemImage: "calendar")
                 }
                 Menu {
+                    Button("Routines…", action: showRoutines)
                     Button(managingPresets ? "Back to Timers" : "Manage Presets…") {
                         managingPresets.toggle()
                     }
@@ -195,6 +198,14 @@ struct TimerMenu: View {
             }
             if let error = loginItem.errorMessage {
                 Text(error).font(.caption).foregroundStyle(.secondary)
+            }
+            if let run = routines.run {
+                HStack {
+                    Text("Routine: \(run.routine.name)").font(.caption.weight(.semibold))
+                    Spacer()
+                    Text(routines.current?.name ?? "").font(.caption)
+                    Button("Open", action: showRoutines)
+                }
             }
             if managingPresets {
                 PresetManager(presets: presets) { managingPresets = false }
@@ -439,6 +450,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let timers = Timers()
     private let presets = Presets()
     private let trackerDesktop = TrackerDesktop()
+    private let routines = RoutineStore()
+    private var routineWindow: NSWindow?
     private let loginItem = LoginItem()
     private let quickPopover = NSPopover()
     private let popover = NSPopover()
@@ -450,6 +463,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var settingsWindow: NSWindow?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        switch UserDefaults.standard.string(forKey: "tactAppearance") {
+        case "Light": NSApp.appearance = NSAppearance(named: .aqua)
+        case "Dark": NSApp.appearance = NSAppearance(named: .darkAqua)
+        default: NSApp.appearance = nil
+        }
         guard let button = item.button else { return }
         button.addSubview(control)
         control.frame = button.bounds
@@ -484,10 +502,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         timers.refresh = { [weak self] in self?.renderStatus() }
         let clock = Timer(timeInterval: 0.25, repeats: true) { [weak self] _ in
             self?.timers.tick()
+            self?.routines.tick()
+            self?.renderStatus()
         }
         self.clock = clock
         RunLoop.main.add(clock, forMode: .common)
         timers.tick()
+        NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.willSleepNotification, object: nil, queue: .main) { [weak self] _ in
+            Task { @MainActor in self?.routines.sleep() }
+        }
+        NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.didWakeNotification, object: nil, queue: .main) { [weak self] _ in
+            Task { @MainActor in self?.routines.wake() }
+        }
+        routines.wake()
         refreshTrackerReminders()
     }
 
@@ -510,7 +537,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func renderStatus() {
         guard let button = item.button else { return }
-        if let width = statusContent.render(timers, on: button) {
+        if let width = statusContent.render(timers, routines: routines, on: button) {
             item.length = width
         }
     }
@@ -521,11 +548,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func makeTimerMenu() -> TimerMenu {
-        TimerMenu(timers: timers, presets: presets, loginItem: loginItem, showTrackers: { [weak self] in
+        TimerMenu(timers: timers, presets: presets, routines: routines, loginItem: loginItem, showTrackers: { [weak self] in
             guard let self else { return }
             popover.performClose(nil)
             trackerDesktop.showDashboard { [weak self] in self?.showTimerWindow() }
-        }, showSettings: { [weak self] in self?.showSettingsWindow() })
+        }, showRoutines: { [weak self] in self?.showRoutinesWindow() },
+           showSettings: { [weak self] in self?.showSettingsWindow() })
+    }
+
+    private func showRoutinesWindow() {
+        popover.performClose(nil)
+        if routineWindow == nil {
+            let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1000, height: 650),
+                                  styleMask: [.titled, .closable, .resizable], backing: .buffered, defer: false)
+            window.title = "Tact Routines"
+            window.isReleasedWhenClosed = false
+            window.contentViewController = NSHostingController(rootView: RoutinesView(store: routines))
+            window.center()
+            routineWindow = window
+        }
+        NSApp.activate(ignoringOtherApps: true)
+        routineWindow?.makeKeyAndOrderFront(nil)
     }
 
     private func showSettingsWindow() {

@@ -57,12 +57,10 @@ final class TrackerStore: ObservableObject {
 
 struct TrackerCard: View {
     let tracker: Tracker
-    @AppStorage("tactAppearance") private var appearance = "System"
 
     var body: some View {
         TimelineView(.everyMinute) { context in
             ProgressCard(tracker: tracker, date: context.date)
-                .preferredColorScheme(appearance == "System" ? nil : (appearance == "Dark" ? .dark : .light))
         }
     }
 }
